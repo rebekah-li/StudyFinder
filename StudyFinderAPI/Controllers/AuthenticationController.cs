@@ -89,14 +89,79 @@ namespace StudyFinderAPI
                 //querying database
                 string query = $"INSERT into users values ('{model.email}', '{model.name}', '{AuthHelper.ByteArrayToString(salt)}', '{AuthHelper.ByteArrayToString(hashed_password)}')";
                 var cmd = new MySqlCommand(query, dbCon.Connection);
-                cmd.ExecuteReader();
-                //var reader = cmd.ExecuteReader();
+                var reader = cmd.ExecuteReader();
                 /*while (reader.Read())
                 {
                     string someStringFromColumnZero = reader.GetString(0);
                     string someStringFromColumnOne = reader.GetString(1);
                     Console.WriteLine(someStringFromColumnZero + "," + someStringFromColumnOne);
                 }*/
+                reader.Close();
+                dbCon.Close();
+            }
+
+            return "Success";
+        }
+
+        // GET: api/auth/login
+        [HttpPost("login")]
+        public String PostLogin([FromBody] AuthModel model)
+        {
+            //validating data received
+            if (model.email.Length == 0 || model.password.Length == 0 || model.name.Length == 0)
+            {
+                return "missing info.";
+            }
+            if (model.password.Length < 8 || model.password.Length > 20)
+            {
+                return "pw no length good.";
+            }
+            if (!new EmailAddressAttribute().IsValid(model.email))
+            {
+                return "email no good.";
+            }
+
+
+            //connecting to database
+            var dbCon = DBConnection.Instance();
+            dbCon.DatabaseName = "StudyFinder";
+            if (dbCon.IsConnect())
+            {
+                //querying database: grabs the record of user based on email
+                string query = $"SELECT * FROM users WHERE email = '{model.email}'";
+                var cmd = new MySqlCommand(query, dbCon.Connection);
+                var reader = cmd.ExecuteReader();
+                //if user is record is found, checks if entered password is correct, else if record is empty returns user is not found
+                if (reader.HasRows)
+                {
+                    reader.Read();
+                    string salt = reader.GetString(2);
+                    string pw = reader.GetString(3);
+                    Console.WriteLine("salt: "+salt+" pw: "+pw);
+
+                    byte[] pw_to_bytes = Encoding.ASCII.GetBytes(salt);
+                    Console.WriteLine("converted_salt: " + AuthHelper.ByteArrayToString(pw_to_bytes));
+
+                    //salted_pw is the hashed password that results from hasing the user entered password with the salt grabbed from db, converts into a string 
+                    string salted_pw = AuthHelper.ByteArrayToString(AuthHelper.GenerateSaltedHash(Encoding.ASCII.GetBytes(model.password), Encoding.ASCII.GetBytes(salt)));
+                    Console.WriteLine("salted_pw: "+salted_pw);
+
+                    if (!pw.Equals(salted_pw))
+                    {
+                        return "password is incorrect.";
+                    }
+                }
+                else
+                {
+                    return "user is not found.";
+                }
+                /*while (reader.Read())
+                {
+                    string someStringFromColumnZero = reader.GetString(0);
+                    string someStringFromColumnOne = reader.GetString(1);
+                    Console.WriteLine(someStringFromColumnZero + "," + someStringFromColumnOne);
+                }*/
+                reader.Close();
                 dbCon.Close();
             }
 
