@@ -9,6 +9,8 @@ using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data;
 using MySql.Data.MySqlClient;
+using System.Data.SqlClient;
+using StudyFinderAPI.Helpers;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -60,8 +62,9 @@ namespace StudyFinderAPI
     {
         // POST: api/auth/signup
         [HttpPost("signup")]
-        public String PostSignUp([FromBody] AuthModel model)
+        public string PostSignUp([FromBody] AuthModel model)
         {
+
             //validating data received
             if (model.email.Length == 0 || model.password.Length == 0 || model.name.Length == 0)
             {
@@ -121,49 +124,57 @@ namespace StudyFinderAPI
                 return "email no good.";
             }
 
-
-            //connecting to database
-            var dbCon = DBConnection.Instance();
-            dbCon.DatabaseName = "StudyFinder";
-            if (dbCon.IsConnect())
+            SqlCommand command = new SqlCommand("select * from users where email = @email");
+            command.Parameters.AddWithValue("@email", model.email);
+            IEnumerable<Dictionary<string, object>> result = DBHelper.queryDatabase(command);
+            if(result.Any())
             {
-                //querying database: grabs the record of user based on email
-                string query = $"SELECT * FROM users WHERE email = '{model.email}'";
-                var cmd = new MySqlCommand(query, dbCon.Connection);
-                var reader = cmd.ExecuteReader();
-                //if user is record is found, checks if entered password is correct, else if record is empty returns user is not found
-                if (reader.HasRows)
-                {
-                    reader.Read();
-                    string salt = reader.GetString(2);
-                    string pw = reader.GetString(3);
-                    Console.WriteLine("salt: "+salt+" pw: "+pw);
-
-                    byte[] pw_to_bytes = Encoding.ASCII.GetBytes(salt);
-                    Console.WriteLine("converted_salt: " + AuthHelper.ByteArrayToString(pw_to_bytes));
-
-                    //salted_pw is the hashed password that results from hasing the user entered password with the salt grabbed from db, converts into a string 
-                    string salted_pw = AuthHelper.ByteArrayToString(AuthHelper.GenerateSaltedHash(Encoding.ASCII.GetBytes(model.password), Encoding.ASCII.GetBytes(salt)));
-                    Console.WriteLine("salted_pw: "+salted_pw);
-
-                    if (!pw.Equals(salted_pw))
-                    {
-                        return "password is incorrect.";
-                    }
-                }
-                else
-                {
-                    return "user is not found.";
-                }
-                /*while (reader.Read())
-                {
-                    string someStringFromColumnZero = reader.GetString(0);
-                    string someStringFromColumnOne = reader.GetString(1);
-                    Console.WriteLine(someStringFromColumnZero + "," + someStringFromColumnOne);
-                }*/
-                reader.Close();
-                dbCon.Close();
+                Dictionary<string, object> record = result.ElementAt(0);
+                string salt = (string) record["salt"];
             }
+
+            ////connecting to database
+            //var dbCon = DBConnection.Instance();
+            //dbCon.DatabaseName = "StudyFinder";
+            //if (dbCon.IsConnect())
+            //{
+            //    //querying database: grabs the record of user based on email
+            //    string query = $"SELECT * FROM users WHERE email = '{model.email}'";
+            //    var cmd = new MySqlCommand(query, dbCon.Connection);
+            //    var reader = cmd.ExecuteReader();
+            //    //if user is record is found, checks if entered password is correct, else if record is empty returns user is not found
+            //    if (reader.HasRows)
+            //    {
+            //        reader.Read();
+            //        string salt = reader.GetString(2);
+            //        string pw = reader.GetString(3);
+            //        Console.WriteLine("salt: "+salt+" pw: "+pw);
+
+            //        byte[] pw_to_bytes = Encoding.ASCII.GetBytes(salt);
+            //        Console.WriteLine("converted_salt: " + AuthHelper.ByteArrayToString(pw_to_bytes));
+
+            //        //salted_pw is the hashed password that results from hasing the user entered password with the salt grabbed from db, converts into a string 
+            //        string salted_pw = AuthHelper.ByteArrayToString(AuthHelper.GenerateSaltedHash(Encoding.ASCII.GetBytes(model.password), Encoding.ASCII.GetBytes(salt)));
+            //        Console.WriteLine("salted_pw: "+salted_pw);
+
+            //        if (!pw.Equals(salted_pw))
+            //        {
+            //            return "password is incorrect.";
+            //        }
+            //    }
+            //    else
+            //    {
+            //        return "user is not found.";
+            //    }
+            //    /*while (reader.Read())
+            //    {
+            //        string someStringFromColumnZero = reader.GetString(0);
+            //        string someStringFromColumnOne = reader.GetString(1);
+            //        Console.WriteLine(someStringFromColumnZero + "," + someStringFromColumnOne);
+            //    }*/
+            //    reader.Close();
+            //    dbCon.Close();
+            //}
 
             return "Success";
         }
